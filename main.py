@@ -68,7 +68,7 @@ def train(train_loader, model, optimizer, epoch):
     dlibLoss = DlibLoss()
     pbar = tqdm(enumerate(train_loader))
 
-    for batch_idx, (data_a, data_p, c) in pbar:
+    for batch_idx, (data_a, data_p, c) in enumerate(train_loader):
         data_a, data_p, c = data_a.cuda(), data_p.cuda(), c.cuda()
         data_a, data_p, c = Variable(data_a), Variable(data_p), Variable(c)
 
