@@ -41,7 +41,7 @@ class DlibLoss(Function):
             for j in range(distance.shape[0]):
                 if i == j:
                     continue
-                if torch.equal(label[i], label[j]):
+                if label[i] == label[j]:
                     num_pos_samps += 1
                     loss += torch.max(Variable(torch.FloatTensor([0])), distance[i][j] - Variable(torch.FloatTensor([self.dis_th + self.margin])))
                 else:

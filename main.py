@@ -73,7 +73,7 @@ def train(train_loader, model, optimizer, epoch):
         data_a, data_p, c = Variable(data_a), Variable(data_p), Variable(c)
 
         out_a, out_p = model(data_a), model(data_p)
-        loss = dlibLoss(out_a, out_p, c)
+        loss = dlibLoss.forward(out_a, out_p, c)
 
         optimizer.zero_grad()
         loss.backward()
