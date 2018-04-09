@@ -103,7 +103,7 @@ class SiameseWhaleDataset(datasets.ImageFolder):
 
         pairs = []
         # Indices = array of labels and each label is an array of indices
-        for b in range(n_batch):
+        for b in tqdm(range(n_batch)):
             indices = create_indices(imgs)
 
             already_sepected = np.zeros((n_classes, ))

@@ -41,19 +41,10 @@ class DlibLoss(Function):
             for j in range(distance.shape[0]):
                 if i == j:
                     continue
-                if (label.data[i] == label.data[j]):
+                if torch.equal(label[i], label[j]):
                     num_pos_samps += 1
                     loss += torch.max(Variable(torch.FloatTensor([0])), distance[i][j] - Variable(torch.FloatTensor([self.dis_th + self.margin])))
                 else:
                     loss += torch.max(Variable(torch.FloatTensor([0])), Variable(torch.FloatTensor([self.dis_th + self.margin])) - distance[i][j])
 
         return loss * 0.5 / num_pos_samps
-
-# For test purpose
-features1 = Variable(torch.rand(17 * 7, 128))
-features2 = Variable(torch.rand(17 * 7, 128))
-label = Variable(torch.rand(17 * 7, ))
-# print(label[0])
-dlib = DlibLoss()
-loss = dlib.forward(features1, features2, label)
-print(loss)
