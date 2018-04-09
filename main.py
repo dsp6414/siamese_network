@@ -5,6 +5,8 @@ import torchvision.transforms as transforms
 
 import os
 from tqdm import tqdm
+from visdom import Visdom
+import numpy as np
 
 from torch.autograd import Variable
 from torch.autograd import Function
@@ -13,7 +15,7 @@ import torch.backends.cudnn as cudnn
 from dataset import SiameseWhaleDataset
 from model import SiameseNetwork
 from config import Configure
-from utils import PairwiseDistance, DlibLoss
+from utils import PairwiseDistance, DlibLoss, ContrastiveLoss
 
 
 # Global config
@@ -39,6 +41,9 @@ train_loader = torch.utils.data.DataLoader(train_dir,
 l2_dist = PairwiseDistance(2)
 
 def main():
+    global plotter
+    plotter = VisdomLinePlotter(env_name=config.visdom_name)
+    
     # instantiate model and initialize weights
     model = SiameseNetwork()
     if config.cuda:
@@ -65,15 +70,16 @@ def main():
 
 def train(train_loader, model, optimizer, epoch):
     model.train()
-    dlibLoss = DlibLoss()
-    pbar = tqdm(enumerate(train_loader))
+    # loss_function = DlibLoss()
+    loss_function = ContrastiveLoss()
+    # pbar = tqdm(enumerate(train_loader))
 
     for batch_idx, (data_a, data_p, c) in enumerate(train_loader):
         data_a, data_p, c = data_a.cuda(), data_p.cuda(), c.cuda()
         data_a, data_p, c = Variable(data_a), Variable(data_p), Variable(c)
 
         out_a, out_p = model(data_a), model(data_p)
-        loss = dlibLoss.forward(out_a, out_p, c)
+        loss = loss_function(out_a, out_p, c)
 
         optimizer.zero_grad()
         loss.backward()
@@ -81,8 +87,10 @@ def train(train_loader, model, optimizer, epoch):
 
         # update the optimizer learning rate
         adjust_learning_rate(optimizer)
+        
+        plotter.plot('loss', 'train', epoch * config.n_batch + batch_idx, loss.data[0])
 
-        if batch_idx % config.log_interval == 0:
+        if (epoch * config.n_batch + batch_idx) % config.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch,
                 batch_idx * len(data_a),
@@ -90,6 +98,8 @@ def train(train_loader, model, optimizer, epoch):
                 100. * batch_idx / len(train_loader),
                 loss.data[0]
             ))
+    torch.save({'epoch': epoch + 1, 'state_dict': model.state_dict()},
+               '{}/checkpoint_{}.pth'.format(config.log_dir, epoch))
 
 def adjust_learning_rate(optimizer):
     """Updates the learning rate given the learning rate decay.
@@ -117,6 +127,23 @@ def create_optimizer(model, new_lr):
                                   lr_decay=config.lr_decay,
                                   weight_decay=config.wd)
     return optimizer
+
+class VisdomLinePlotter(object):
+    """Plots to Visdom"""
+    def __init__(self, env_name='main'):
+        self.viz = Visdom()
+        self.env = env_name
+        self.plots = {}
+    def plot(self, var_name, split_name, x, y):
+        if var_name not in self.plots:
+            self.plots[var_name] = self.viz.line(X=np.array([x,x]), Y=np.array([y,y]), env=self.env, opts=dict(
+                legend=[split_name],
+                title=var_name,
+                xlabel='steps',
+                ylabel=var_name
+            ))
+        else:
+            self.viz.updateTrace(X=np.array([x]), Y=np.array([y]), env=self.env, win=self.plots[var_name], name=split_name)
 
 if __name__ == '__main__':
     main()

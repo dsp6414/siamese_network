@@ -35,7 +35,7 @@ class DlibLoss(Function):
 
     def forward(self, feature1, feature2, label):
         loss = Variable(torch.FloatTensor([0]))
-        distance = self.pdist.forward(feature1, feature2)
+        distance = self.pdist.forward(feature1, feature2).sqrt()
         num_pos_samps = 0.00001
         for i in range(distance.shape[0]):
             for j in range(distance.shape[0]):
@@ -48,3 +48,31 @@ class DlibLoss(Function):
                     loss += torch.max(Variable(torch.FloatTensor([0])), Variable(torch.FloatTensor([self.dis_th + self.margin])) - distance[i][j].cpu())
 
         return loss * 0.5 / num_pos_samps
+
+class ContrastiveLoss(torch.nn.Module):
+    """
+    Contrastive loss function.
+    Based on:
+    """
+
+    def __init__(self, margin=1.0):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+        self.pdist = PairwiseDistance(2)  # norm 2
+
+    def forward(self, feature1, feature2, label):
+        
+        loss = Variable(torch.FloatTensor([0]))
+        distance = self.pdist.forward(feature1, feature2)
+        count = 0
+        for i in range(distance.shape[0]):
+            for j in range(distance.shape[0]):
+                if i == j:
+                    continue
+                mdist = Variable(torch.FloatTensor([self.margin])) - distance[i][j].sqrt().cpu()
+                dist = torch.clamp(mdist, min=0.0)
+                y = label[i] == label[j]
+                loss += y.type(torch.FloatTensor).cpu() * distance[i][j].cpu() + (1-y.type(torch.FloatTensor).cpu()) * torch.pow(distance[i][j].sqrt().cpu(), 2)
+                count += 1
+
+        return loss / 2.0 / count
